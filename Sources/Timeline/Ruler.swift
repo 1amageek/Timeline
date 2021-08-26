@@ -43,6 +43,19 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
 
     var color: Color
 
+    #if os(macOS)
+    public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(.separatorColor)) {
+        self.axisScale = AxisScale(range: range, scale: scale)
+        self.color = color
+    }
+
+    public init(axisScale: AxisScale<Bound>, color: Color = Color(.separatorColor)) {
+        self.axisScale = axisScale
+        self.color = color
+    }
+    #endif
+
+    #if os(iOS)
     public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(.separator)) {
         self.axisScale = AxisScale(range: range, scale: scale)
         self.color = color
@@ -52,6 +65,7 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
         self.axisScale = axisScale
         self.color = color
     }
+    #endif
 
     public var body: some View {
         GeometryReader { proxy in
