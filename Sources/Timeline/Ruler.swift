@@ -43,12 +43,12 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
 
     var color: Color
 
-    public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(UIColor.separator)) {
+    public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(.separator)) {
         self.axisScale = AxisScale(range: range, scale: scale)
         self.color = color
     }
 
-    public init(axisScale: AxisScale<Bound>, color: Color = Color(UIColor.separator)) {
+    public init(axisScale: AxisScale<Bound>, color: Color = Color(.separator)) {
         self.axisScale = axisScale
         self.color = color
     }
