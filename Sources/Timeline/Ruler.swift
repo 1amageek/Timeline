@@ -13,8 +13,8 @@ public struct Ruler<Bound: BinaryFloatingPoint, Content: View>: View {
 
     var content: (Double) -> Content
 
-    public init(range: Range<Bound>, scale: Double = 1, content: @escaping (Double) -> Content) {
-        self.axisScale = AxisScale(range: range, scale: scale)
+    public init(axis: Axis, range: Range<Bound>, scale: Double = 1, content: @escaping (Double) -> Content) {
+        self.axisScale = AxisScale(axis: axis, range: range, scale: scale)
         self.content = content
     }
 
@@ -23,16 +23,36 @@ public struct Ruler<Bound: BinaryFloatingPoint, Content: View>: View {
         self.content = content
     }
 
-    public var body: some View {
+    var verticalBody: some View {
         GeometryReader { proxy in
             ZStack {
                 ForEach(0..<axisScale.numberOfGrids) { grid in
-                    let (width, position) = axisScale.property(grid: grid, size: proxy.size)
+                    let (size, position) = axisScale.property(grid: grid, size: proxy.size)
                     content(axisScale.gridLabel(grid: grid))
-                        .frame(width: width)
+                        .frame(height: size.height)
                         .position(position)
                 }
             }
+        }
+    }
+
+    var horizontalBody: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(0..<axisScale.numberOfGrids) { grid in
+                    let (size, position) = axisScale.property(grid: grid, size: proxy.size)
+                    content(axisScale.gridLabel(grid: grid))
+                        .frame(width: size.width)
+                        .position(position)
+                }
+            }
+        }
+    }
+
+    public var body: some View {
+        switch axisScale.axis {
+            case .vertical: verticalBody
+            case .horizontal: horizontalBody
         }
     }
 }
@@ -44,8 +64,8 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
     var color: Color
 
     #if os(macOS)
-    public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(.separatorColor)) {
-        self.axisScale = AxisScale(range: range, scale: scale)
+    public init(axis: Axis, range: Range<Bound>, scale: Double = 1, color: Color = Color(.separatorColor)) {
+        self.axisScale = AxisScale(axis: axis, range: range, scale: scale)
         self.color = color
     }
 
@@ -56,8 +76,8 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
     #endif
 
     #if os(iOS)
-    public init(range: Range<Bound>, scale: Double = 1, color: Color = Color(.separator)) {
-        self.axisScale = AxisScale(range: range, scale: scale)
+    public init(axis: Axis, range: Range<Bound>, scale: Double = 1, color: Color = Color(.separator)) {
+        self.axisScale = AxisScale(axis: axis, range: range, scale: scale)
         self.color = color
     }
 
@@ -67,28 +87,56 @@ public struct BackgroundGide<Bound: BinaryFloatingPoint>: View {
     }
     #endif
 
-    public var body: some View {
+    var verticalBody: some View {
         GeometryReader { proxy in
             ZStack {
                 ForEach(0..<axisScale.numberOfGrids) { grid in
-                    let (width, position) = axisScale.property(grid: grid, size: proxy.size)
+                    let (size, position) = axisScale.property(grid: grid, size: proxy.size)
+                    VStack {
+                        Rectangle()
+                            .fill(Color.gray)
+                            .frame(height: 1)
+                        Spacer()
+                    }
+                    .frame(width: size.width, height: size.height)
+                    .position(position)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height * axisScale.scale)
+        }
+    }
+
+    var horizontalBody: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ForEach(0..<axisScale.numberOfGrids) { grid in
+                    let (size, position) = axisScale.property(grid: grid, size: proxy.size)
                     HStack {
                         Rectangle()
                             .fill(Color.gray)
                             .frame(width: 1)
                         Spacer()
                     }
-                        .frame(width: width)
-                        .position(position)
+                    .frame(width: size.width, height: size.height)
+                    .position(position)
                 }
             }
             .frame(width: proxy.size.width * axisScale.scale, height: proxy.size.height)
+        }
+    }
+
+    public var body: some View {
+        switch axisScale.axis {
+            case .vertical: verticalBody
+            case .horizontal: horizontalBody
         }
     }
 }
 
 
 public struct AxisScale<Bound: BinaryFloatingPoint> {
+
+    var axis: Axis
 
     var range: Range<Bound>
 
@@ -98,7 +146,8 @@ public struct AxisScale<Bound: BinaryFloatingPoint> {
 
     var numberOfGrids: Int
 
-    public init(range: Range<Bound>, scale: Double = 1) {
+    public init(axis: Axis, range: Range<Bound>, scale: Double = 1) {
+        self.axis = axis
         self.range = range
         self.scale = scale
         let magnitude = Double(range.upperBound - range.lowerBound)
@@ -117,20 +166,43 @@ public struct AxisScale<Bound: BinaryFloatingPoint> {
         return Double(range.upperBound - range.lowerBound)
     }
 
-    func property(grid: Int, size: CGSize) -> (CGFloat, CGPoint) {
+    func property(grid: Int, size: CGSize) -> (CGSize, CGPoint) {
         let magnitude = Double(range.upperBound - range.lowerBound)
-        let width = interval / magnitude * size.width * scale
-        let x = Double(grid) * interval / magnitude * size.width * scale + width / 2
-        let y = size.height / 2
-        let position = CGPoint(x: x, y: y)
-        return (width, position)
+        switch axis {
+            case .vertical:
+                let height = interval / magnitude * size.height * scale
+                let y = Double(grid) * interval / magnitude * size.height * scale + height / 2
+                let x = size.width / 2
+                let position = CGPoint(x: x, y: y)
+                return (CGSize(width: size.width, height: height), position)
+            case .horizontal:
+                let width = interval / magnitude * size.width * scale
+                let x = Double(grid) * interval / magnitude * size.width * scale + width / 2
+                let y = size.height / 2
+                let position = CGPoint(x: x, y: y)
+                return (CGSize(width: width, height: size.height), position)
+        }
     }
 }
 
 struct Ruler_Previews: PreviewProvider {
     static var previews: some View {
         Group {
-            Ruler(range: (0..<10)) { scale in
+            Ruler(axis: .vertical, range: (0..<10)) { scale in
+                VStack {
+                    Rectangle()
+                        .fill(Color.gray)
+                        .frame(height: 1)
+                    HStack {
+                        Spacer()
+                        Text("\(Int(scale))")
+                    }
+                    Spacer()
+                }
+            }
+//            BackgroundGide(axis: .vertical, range: (0..<100))
+
+            Ruler(axis: .horizontal, range: (0..<10)) { scale in
                 HStack {
                     Rectangle()
                         .fill(Color.gray)
@@ -142,7 +214,7 @@ struct Ruler_Previews: PreviewProvider {
                     Spacer()
                 }
             }
-            BackgroundGide(range: (0..<100))
+//            BackgroundGide(axis: .horizontal, range: (0..<100))
         }
     }
 }

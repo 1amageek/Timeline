@@ -23,7 +23,10 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
 
     let rulerHieght: CGFloat = 32
 
+    let rulerWidth: CGFloat = 32
+
     public init(
+        axis: Axis,
         lanes: [Lane],
         range: Range<Item.Bound>,
         scale: CGFloat = 1,
@@ -31,25 +34,26 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
         controlPanel: @escaping (Lane) -> ControlPanel,
         content: @escaping (Lane, Item) -> Content
     ) {
-        self.model = Model(lanes: lanes, range: range, scale: scale)
+        self.model = Model(axis: axis, lanes: lanes, range: range, scale: scale)
         self.axisLabel = axisLabel
         self.controlPanel = controlPanel
         self.content = content
     }
 
     public init(
+        axis: Axis,
         lanes: [Lane],
         range: Range<Item.Bound>,
         scale: CGFloat = 1,
         content: @escaping (Lane, Item) -> Content
     ) where AxisLabel == Never, ControlPanel == Never {
-        self.model = Model(lanes: lanes, range: range, scale: scale)
+        self.model = Model(axis: axis, lanes: lanes, range: range, scale: scale)
         self.axisLabel = nil
         self.controlPanel = nil
         self.content = content
     }
 
-    public var body: some View {
+    var horizontalBody: some View {
         HStack(spacing: 0) {
 
             if let controlPanel = controlPanel {
@@ -70,7 +74,7 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
                     Group {
                         if let axisLabel = axisLabel {
                             VStack(spacing: 0) {
-                                Ruler(range: model.range) { grid in
+                                Ruler(axis: model.axis, range: model.range) { grid in
                                     HStack {
                                         Rectangle()
                                             .fill(Color.gray)
@@ -86,20 +90,81 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
                                     LaneView(model: model, lane: lane, content: content)
                                 }
                             }
-                            .background(BackgroundGide(range: model.range))
+                            .background(BackgroundGide(axis: model.axis, range: model.range))
                         } else {
                             VStack(spacing: 0) {
                                 ForEach(model.lanes) { lane in
                                     LaneView(model: model, lane: lane, content: content)
                                 }
                             }
-                            .background(BackgroundGide(range: model.range))
+                            .background(BackgroundGide(axis: model.axis, range: model.range))
                         }
                     }
                     .frame(width: proxy.size.width * model.scale, height: proxy.size.height)
                 }
                 .compositingGroup()
             }
+        }
+    }
+
+    var verticalBody: some View {
+        VStack(spacing: 0) {
+
+            if let controlPanel = controlPanel {
+                GeometryReader { proxy in
+                    HStack(spacing: 0) {
+                        ForEach(model.lanes) { lane in
+                            controlPanel(lane)
+                                .frame(width: proxy.size.width / CGFloat(model.lanes.count))
+                        }
+                    }
+                }
+                .padding(.top, rulerHieght)
+                .frame(maxHeight: 120)
+            }
+
+            GeometryReader { proxy in
+                ScrollView([.vertical]) {
+                    Group {
+                        if let axisLabel = axisLabel {
+                            HStack(spacing: 0) {
+                                Ruler(axis: model.axis, range: model.range) { grid in
+                                    VStack {
+                                        Rectangle()
+                                            .fill(Color.gray)
+                                            .frame(height: 1)
+                                        HStack {
+                                            Spacer()
+                                            axisLabel(grid)
+                                        }
+                                        Spacer()
+                                    }
+                                }.frame(width: rulerWidth)
+                                ForEach(model.lanes) { lane in
+                                    LaneView(model: model, lane: lane, content: content)
+                                }
+                            }
+                            .background(BackgroundGide(axis: model.axis, range: model.range))
+                        } else {
+                            HStack(spacing: 0) {
+                                ForEach(model.lanes) { lane in
+                                    LaneView(model: model, lane: lane, content: content)
+                                }
+                            }
+                            .background(BackgroundGide(axis: model.axis, range: model.range))
+                        }
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height * model.scale)
+                }
+                .compositingGroup()
+            }
+        }
+    }
+
+    public var body: some View {
+        switch model.axis {
+            case .vertical: verticalBody
+            case .horizontal: horizontalBody
         }
     }
 }
@@ -124,9 +189,9 @@ extension Timeline {
             GeometryReader { proxy in
                 ZStack {
                     ForEach(lane.items) { item in
-                        let (width, position) = model.property(item: item, size: proxy.size)
+                        let (size, position) = model.property(item: item, size: proxy.size)
                         content(lane, item)
-                            .frame(width: width)
+                            .frame(width: size.width, height: size.height)
                             .position(position)
                     }
                 }
@@ -136,11 +201,18 @@ extension Timeline {
     }
 }
 
+public enum Axis {
+    case vertical
+    case horizontal
+}
+
 struct TimelineModel<Lane: TimelineLaneProtocol> {
 
     typealias Item = Lane.Item
 
     typealias Bound = Item.Bound
+
+    var axis: Axis
 
     var lanes: [Lane]
 
@@ -148,7 +220,8 @@ struct TimelineModel<Lane: TimelineLaneProtocol> {
 
     var scale: Double
 
-    init(lanes: [Lane] = [], range: Range<Item.Bound>, scale: Double = 1) {
+    init(axis: Axis, lanes: [Lane] = [], range: Range<Item.Bound>, scale: Double = 1) {
+        self.axis = axis
         self.lanes = lanes
         self.range = range
         self.scale = scale
@@ -161,14 +234,25 @@ extension TimelineModel {
         return Double(range.upperBound - range.lowerBound)
     }
 
-    func property(item: Item, size: CGSize) -> (CGFloat, CGPoint) {
-        let timelineMagnitude = magnitude(of: range)
-        let itemMagnitude = magnitude(of: item.range)
-        let width = size.width * itemMagnitude / timelineMagnitude
-        let x = Double(item.range.lowerBound - range.lowerBound) * (size.width / timelineMagnitude) + (width / 2)
-        let y = size.height / 2
-        let position = CGPoint(x: x, y: y)
-        return (width, position)
+    func property(item: Item, size: CGSize) -> (CGSize, CGPoint) {
+        switch axis {
+            case .horizontal:
+                let timelineMagnitude = magnitude(of: range)
+                let itemMagnitude = magnitude(of: item.range)
+                let width = size.width * itemMagnitude / timelineMagnitude
+                let x = Double(item.range.lowerBound - range.lowerBound) * (size.width / timelineMagnitude) + (width / 2)
+                let y = size.height / 2
+                let position = CGPoint(x: x, y: y)
+                return (CGSize(width: width, height: size.height), position)
+            case .vertical:
+                let timelineMagnitude = magnitude(of: range)
+                let itemMagnitude = magnitude(of: item.range)
+                let height = size.height * itemMagnitude / timelineMagnitude
+                let y = Double(item.range.lowerBound - range.lowerBound) * (size.height / timelineMagnitude) + (height / 2)
+                let x = size.width / 2
+                let position = CGPoint(x: x, y: y)
+                return (CGSize(width: size.width, height: height), position)
+        }
     }
 }
 
@@ -244,7 +328,8 @@ struct Timeline_Previews: PreviewProvider {
     static var previews: some View {
 
         Group {
-            Timeline(lanes: lanes, range: (0..<10), scale: 1.3, axisLabel: { grid in
+            // horizontal
+            Timeline(axis: .horizontal, lanes: lanes, range: (0..<10), scale: 1.3, axisLabel: { grid in
                 Text("\(Int(grid))")
                     .padding(6)
             }, controlPanel: { lane in
@@ -256,7 +341,26 @@ struct Timeline_Previews: PreviewProvider {
                     .padding(1)
             }
 
-            Timeline(lanes: lanes, range: (0..<10), scale: 1.3) { lane, item in
+            Timeline(axis: .horizontal, lanes: lanes, range: (0..<10), scale: 1.3) { lane, item in
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.green)
+                    .padding(1)
+            }
+
+            // vertical
+            Timeline(axis: .vertical, lanes: lanes, range: (0..<10), scale: 1.3, axisLabel: { grid in
+                Text("\(Int(grid))")
+                    .padding(6)
+            }, controlPanel: { lane in
+                Text(lane.id)
+                    .frame(width: 100)
+            }) { lane, item in
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.green)
+                    .padding(1)
+            }
+
+            Timeline(axis: .vertical, lanes: lanes, range: (0..<10), scale: 1.3) { lane, item in
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.green)
                     .padding(1)
