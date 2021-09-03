@@ -54,37 +54,42 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
         self.content = content
     }
 
+    @ViewBuilder
+    var horizontalAxisLabel: some View {
+        if let axisLabel = axisLabel {
+            VStack(spacing: 0) {
+                Ruler(axis: model.axis, range: model.range) { grid in
+                    axisLabel(grid)
+                }
+                .padding(.leading, insets.leading)
+                .frame(height: insets.top)
+                Spacer()
+            }
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
     var horizontalBody: some View {
         ZStack {
             GeometryReader { proxy in
                 ScrollView([.horizontal]) {
-                    Group {
-                        if let axisLabel = axisLabel {
-                            VStack(spacing: 0) {
-                                Ruler(axis: model.axis, range: model.range) { grid in
-                                    axisLabel(grid)
-                                }
-                                .frame(height: insets.top)
-                                ForEach(model.lanes) { lane in
-                                    LaneView(model: model, lane: lane, content: content)
-                                }
+                    ZStack {
+                        VStack(spacing: 0) {
+                            ForEach(model.lanes) { lane in
+                                LaneView(model: model, lane: lane, content: content)
                             }
-                            .background(BackgroundGide(axis: model.axis, range: model.range))
-                        } else {
-                            VStack(spacing: 0) {
-                                ForEach(model.lanes) { lane in
-                                    LaneView(model: model, lane: lane, content: content)
-                                }
-                            }
-                            .background(BackgroundGide(axis: model.axis, range: model.range))
                         }
+                        .background(BackgroundGide(axis: model.axis, range: model.range))
+                        .padding(insets)
+                        .frame(width: proxy.size.width * model.scale, height: proxy.size.height)
+
+                        horizontalAxisLabel
                     }
-                    .frame(width: proxy.size.width * model.scale, height: proxy.size.height)
                 }
-                .compositingGroup()
             }
-            .padding(.leading, insets.leading)
-            .padding(.trailing, insets.trailing)
+            .compositingGroup()
 
             if let controlPanel = controlPanel {
                 HStack(spacing: 0) {
@@ -104,37 +109,42 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
         }
     }
 
+    @ViewBuilder
+    var verticalAxisLabel: some View {
+        if let axisLabel = axisLabel {
+            HStack(spacing: 0) {
+                Ruler(axis: model.axis, range: model.range) { grid in
+                    axisLabel(grid)
+                }
+                .padding(.top, insets.top)
+                .frame(width: insets.leading)
+                Spacer()
+            }
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
     var verticalBody: some View {
         ZStack {
             GeometryReader { proxy in
                 ScrollView([.vertical]) {
-                    Group {
-                        if let axisLabel = axisLabel {
-                            HStack(spacing: 0) {
-                                Ruler(axis: model.axis, range: model.range) { grid in
-                                    axisLabel(grid)
-                                }
-                                .frame(width: insets.leading)
-                                ForEach(model.lanes) { lane in
-                                    LaneView(model: model, lane: lane, content: content)
-                                }
+                    ZStack {
+                        HStack(spacing: 0) {
+                            ForEach(model.lanes) { lane in
+                                LaneView(model: model, lane: lane, content: content)
                             }
-                            .background(BackgroundGide(axis: model.axis, range: model.range))
-                        } else {
-                            HStack(spacing: 0) {
-                                ForEach(model.lanes) { lane in
-                                    LaneView(model: model, lane: lane, content: content)
-                                }
-                            }
-                            .background(BackgroundGide(axis: model.axis, range: model.range))
                         }
+                        .background(BackgroundGide(axis: model.axis, range: model.range))
+                        .padding(insets)
+                        .frame(width: proxy.size.width, height: proxy.size.height * model.scale)
+
+                        verticalAxisLabel
                     }
-                    .frame(width: proxy.size.width, height: proxy.size.height * model.scale)
                 }
-                .compositingGroup()
             }
-            .padding(.top, insets.top)
-            .padding(.bottom, insets.bottom)
+            .compositingGroup()
 
             if let controlPanel = controlPanel {
                 VStack(spacing: 0) {
