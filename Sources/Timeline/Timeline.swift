@@ -21,20 +21,20 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
 
     var content: (Lane, Item) -> Content
 
-    let rulerHieght: CGFloat = 32
-
-    let rulerWidth: CGFloat = 32
+    var insets: EdgeInsets
 
     public init(
         axis: Axis,
         lanes: [Lane],
         range: Range<Item.Bound>,
         scale: CGFloat = 1,
+        insets: EdgeInsets = EdgeInsets(top: 44, leading: 44, bottom: 0, trailing: 0),
         axisLabel: @escaping (Double) -> AxisLabel,
         controlPanel: @escaping (Lane) -> ControlPanel,
         content: @escaping (Lane, Item) -> Content
     ) {
         self.model = Model(axis: axis, lanes: lanes, range: range, scale: scale)
+        self.insets = insets
         self.axisLabel = axisLabel
         self.controlPanel = controlPanel
         self.content = content
@@ -48,44 +48,23 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
         content: @escaping (Lane, Item) -> Content
     ) where AxisLabel == Never, ControlPanel == Never {
         self.model = Model(axis: axis, lanes: lanes, range: range, scale: scale)
+        self.insets = EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0)
         self.axisLabel = nil
         self.controlPanel = nil
         self.content = content
     }
 
     var horizontalBody: some View {
-        HStack(spacing: 0) {
-
-            if let controlPanel = controlPanel {
-                GeometryReader { proxy in
-                    VStack(spacing: 0) {
-                        ForEach(model.lanes) { lane in
-                            controlPanel(lane)
-                                .frame(height: proxy.size.height / CGFloat(model.lanes.count))
-                        }
-                    }
-                }
-                .padding(.top, rulerHieght)
-                .frame(maxWidth: 120)
-            }
-
+        ZStack {
             GeometryReader { proxy in
                 ScrollView([.horizontal]) {
                     Group {
                         if let axisLabel = axisLabel {
                             VStack(spacing: 0) {
                                 Ruler(axis: model.axis, range: model.range) { grid in
-                                    HStack {
-                                        Rectangle()
-                                            .fill(Color.gray)
-                                            .frame(width: 1)
-                                        VStack {
-                                            axisLabel(grid)
-                                            Spacer()
-                                        }
-                                        Spacer()
-                                    }
-                                }.frame(height: rulerHieght)
+                                    axisLabel(grid)
+                                }
+                                .frame(height: insets.top)
                                 ForEach(model.lanes) { lane in
                                     LaneView(model: model, lane: lane, content: content)
                                 }
@@ -104,42 +83,38 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
                 }
                 .compositingGroup()
             }
+            .padding(.leading, insets.leading)
+            .padding(.trailing, insets.trailing)
+
+            if let controlPanel = controlPanel {
+                HStack(spacing: 0) {
+                    GeometryReader { proxy in
+                        VStack(spacing: 0) {
+                            ForEach(model.lanes) { lane in
+                                controlPanel(lane)
+                                    .frame(height: proxy.size.height / CGFloat(model.lanes.count))
+                            }
+                        }
+                        .frame(width: insets.leading)
+                    }
+                    .padding(.top, insets.top)
+                    Spacer()
+                }
+            }
         }
     }
 
     var verticalBody: some View {
-        VStack(spacing: 0) {
-
-            if let controlPanel = controlPanel {
-                GeometryReader { proxy in
-                    HStack(spacing: 0) {
-                        ForEach(model.lanes) { lane in
-                            controlPanel(lane)
-                                .frame(width: proxy.size.width / CGFloat(model.lanes.count))
-                        }
-                    }
-                }
-                .padding(.top, rulerHieght)
-                .frame(maxHeight: 120)
-            }
-
+        ZStack {
             GeometryReader { proxy in
                 ScrollView([.vertical]) {
                     Group {
                         if let axisLabel = axisLabel {
                             HStack(spacing: 0) {
                                 Ruler(axis: model.axis, range: model.range) { grid in
-                                    VStack {
-                                        Rectangle()
-                                            .fill(Color.gray)
-                                            .frame(height: 1)
-                                        HStack {
-                                            Spacer()
-                                            axisLabel(grid)
-                                        }
-                                        Spacer()
-                                    }
-                                }.frame(width: rulerWidth)
+                                    axisLabel(grid)
+                                }
+                                .frame(width: insets.leading)
                                 ForEach(model.lanes) { lane in
                                     LaneView(model: model, lane: lane, content: content)
                                 }
@@ -157,6 +132,24 @@ public struct Timeline<Lane: TimelineLaneProtocol, AxisLabel: View, ControlPanel
                     .frame(width: proxy.size.width, height: proxy.size.height * model.scale)
                 }
                 .compositingGroup()
+            }
+            .padding(.top, insets.top)
+            .padding(.bottom, insets.bottom)
+
+            if let controlPanel = controlPanel {
+                VStack(spacing: 0) {
+                    GeometryReader { proxy in
+                        HStack(spacing: 0) {
+                            ForEach(model.lanes) { lane in
+                                controlPanel(lane)
+                                    .frame(width: proxy.size.width / CGFloat(model.lanes.count))
+                            }
+                        }
+                        .frame(height: insets.top)
+                    }
+                    .padding(.leading, insets.leading)
+                    Spacer()
+                }
             }
         }
     }
@@ -330,11 +323,19 @@ struct Timeline_Previews: PreviewProvider {
         Group {
             // horizontal
             Timeline(axis: .horizontal, lanes: lanes, range: (0..<10), scale: 1.3, axisLabel: { grid in
-                Text("\(Int(grid))")
-                    .padding(6)
+                HStack {
+                    Rectangle()
+                        .fill(Color.gray)
+                        .frame(width: 1)
+                    VStack {
+                        Text("\(Int(grid))")
+                            .padding(6)
+                        Spacer()
+                    }
+                    Spacer()
+                }
             }, controlPanel: { lane in
                 Text(lane.id)
-                    .frame(width: 100)
             }) { lane, item in
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.green)
@@ -349,11 +350,19 @@ struct Timeline_Previews: PreviewProvider {
 
             // vertical
             Timeline(axis: .vertical, lanes: lanes, range: (0..<10), scale: 1.3, axisLabel: { grid in
-                Text("\(Int(grid))")
-                    .padding(6)
+                VStack {
+                    Rectangle()
+                        .fill(Color.gray)
+                        .frame(height: 1)
+                    HStack {
+                        Spacer()
+                        Text("\(Int(grid))")
+                            .padding(6)
+                    }
+                    Spacer()
+                }
             }, controlPanel: { lane in
                 Text(lane.id)
-                    .frame(width: 100)
             }) { lane, item in
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.green)
